@@ -83,10 +83,29 @@ i32 fsOpen(str fname) {
 // read (may be less than 'numb' if we hit EOF).  On failure, abort
 // ============================================================================
 i32 fsRead(i32 fd, i32 numb, void* buf) {
+  i32 size = fsSize(fd); //get the size of the fd
+  i32 inum = bfsFdToInum(fd); //turns the fd to an inum
+  i32 cursor = fsTell(fd);
+  
+  //getting the first and last FBN 
+  i32 beginningFBN = cursor / BYTESPERBLOCK;
+  i32 endingFBN = size / BYTESPERBLOCK;
 
-  // ++++++++++++++++++++++++
-  // Insert your code here
-  // ++++++++++++++++++++++++
+  i32 lastByte = cursor + numb;
+  if(lastByte > size){
+    lastByte = size;
+    numb = size - cursor; 
+  }
+
+  i32 lastFBN = lastByte / BYTESPERBLOCK;
+  if(lastFBN > endingFBN){
+    lastFBN = endingFBN;
+  }
+
+
+
+
+  
 
   FATAL(ENYI);                                  // Not Yet Implemented!
   return 0;
