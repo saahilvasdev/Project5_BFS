@@ -85,30 +85,28 @@ i32 fsOpen(str fname) {
 i32 fsRead(i32 fd, i32 numb, void* buf) {
   i32 size = fsSize(fd); //get the size of the fd
   i32 inum = bfsFdToInum(fd); //turns the fd to an inum
-  i32 cursor = fsTell(fd);
+  i32 cursor = fsTell(fd);  //gets the current cursor
+  i8 *buffer = malloc(BYTESPERBLOCK * BLOCKSPERDISK); //creates a temporary buffer to read in data
+  i32 bytesAlreadyRead;
   
-  //getting the first and last FBN 
-  i32 beginningFBN = cursor / BYTESPERBLOCK;
-  i32 endingFBN = size / BYTESPERBLOCK;
+  //getting the first and last block required to read
+  i32 currentFBN = cursor / BYTESPERBLOCK;
+  i32 endingFBN = (cursor + numb) / BYTESPERBLOCK;
 
-  i32 lastByte = cursor + numb;
-  if(lastByte > size){
-    lastByte = size;
-    numb = size - cursor; 
+  cursor = cursor - (currentFBN * BYTESPERBLOCK); //get the cursor position at the inital fbn
+
+  i32 maxLoop = (endingFBN - currentFBN + 1) * BYTESPERBLOCK;
+
+  for(bytesAlreadyRead = 0; bytesAlreadyRead < maxLoop; bytesAlreadyRead += BYTESPERBLOCK){
+    i32 currentDBN = bfsFbnToDbn(inum, currentFBN);
+    bioRead(currentDBN, &buffer[bytesAlreadyRead]);
+    currentFBN = currentFBN + 1;
   }
+  memcpy(buf, &buffer[cursor], numb);
+  fsSeek(fd, numb, SEEK_CUR);
 
-  i32 lastFBN = lastByte / BYTESPERBLOCK;
-  if(lastFBN > endingFBN){
-    lastFBN = endingFBN;
-  }
-
-
-
-
-  
-
-  FATAL(ENYI);                                  // Not Yet Implemented!
-  return 0;
+  //FATAL(ENYI);                                  // Not Yet Implemented!
+  return numb;
 }
 
 
@@ -176,11 +174,20 @@ i32 fsSize(i32 fd) {
 // destination file.  On success, return 0.  On failure, abort
 // ============================================================================
 i32 fsWrite(i32 fd, i32 numb, void* buf) {
+  i32 inum = bfsFdToInum(fd); //turns the fd to an inum
+  i32 cursor = fsTell(fd);  //gets the current cursor
+  
+  //Finds the current block we will start writing
+  i32 currentFBN = cursor / BYTESPERBLOCK;
+  i32 currentDBN = bfsFbnToDbn(inum, currentFBN);
 
-  // ++++++++++++++++++++++++
-  // Insert your code here
-  // ++++++++++++++++++++++++
+  //Finds the last block we will need to write to
+  i32 lastFBN = (cursor + numb) / BYTESPERBLOCK;
+  i32 lastDBN = bfsFbnToDbn(inum, lastFBN);
 
-  FATAL(ENYI);                                  // Not Yet Implemented!
+
+
+
+  //FATAL(ENYI);                                  // Not Yet Implemented!
   return 0;
 }
