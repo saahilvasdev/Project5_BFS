@@ -236,10 +236,19 @@ i32 fsWrite(i32 fd, i32 numb, void* buf) {
       break;
     }
 
-    if(startingFBN == lastFBN){
-      bytesWrittenExtend = numb;
-      i32 extraBlock = (numb / BYTESPERBLOCK) + 1;
-      bfsExtend(inum, lastFBN + extraBlock);
+    // if(startingFBN == lastFBN){
+    //   bytesWrittenExtend = numb;
+    //   i32 extraBlock = (numb / BYTESPERBLOCK) + 1;
+    //   bfsExtend(inum, lastFBN + extraBlock);
+    //   //bfsSetSize(inum,size + bytesWrittenExtend);
+    // }
+
+    //THIS WORKS IF WE RUN ./a.out multiple times
+    if(cursor + numb > size){
+      i32 totalSize = cursor + numb;
+      i32 addingBlocks = (totalSize / BYTESPERBLOCK) + 1;
+      bfsExtend(inum, addingBlocks);
+      bfsSetSize(inum, totalSize);
     }
 
     currentBlockByte = startingFBN * BYTESPERBLOCK;
@@ -273,7 +282,7 @@ i32 fsWrite(i32 fd, i32 numb, void* buf) {
 
   }
 
-  bfsSetSize(inum,size + bytesWrittenExtend);
+  //bfsSetSize(inum,size + bytesWrittenExtend);
 
 
   //FATAL(ENYI);                                  // Not Yet Implemented!
