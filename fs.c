@@ -213,9 +213,69 @@ i32 fsSize(i32 fd) {
 // destination file.  On success, return 0.  On failure, abort
 // ============================================================================
 i32 fsWrite(i32 fd, i32 numb, void* buf) {
+  i32 size = fsSize(fd); //get the size of the fd
+  i32 inum = bfsFdToInum(fd); //turns the fd to an inum
+  i32 ofte = bfsFindOFTE(inum); //find ofte
+  i32 cursor = fsTell(fd);  //gets the current cursor
+
+  i32 startingFBN = cursor / BYTESPERBLOCK;
+  i32 lastFBN = size / BYTESPERBLOCK;
+
+  i32 bytesWritten = 0;
+  i32 trailBytes;
+  i32 bytesWrittenExtend;
+  i32 bytesToWrite;
+  i32 currentBlockByte;
+  i32 cursorBlockIndex;
+
+  i8 blockDBN[BYTESPERBLOCK];
+  i8 numberBytesToWrite[BYTESPERBLOCK];
+
+  while(true){
+    if(numb == 0){
+      break;
+    }
+
+    if(startingFBN == lastFBN){
+      bytesWrittenExtend = numb;
+      i32 extraBlock = (numb / BYTESPERBLOCK) + 1;
+      bfsExtend(inum, lastFBN + extraBlock);
+    }
+
+    currentBlockByte = startingFBN * BYTESPERBLOCK;
+    cursorBlockIndex = cursor - currentBlockByte;
+    trailBytes = BYTESPERBLOCK - cursorBlockIndex;
+
+    if(trailBytes > numb){
+      bytesToWrite = numb;
+    }
+    else{
+      bytesToWrite = trailBytes;
+    }
+
+    bfsRead(inum, startingFBN, blockDBN);
+
+    memset(numberBytesToWrite, 0, sizeof numberBytesToWrite);
+
+    memcpy(numberBytesToWrite, (buf + bytesWritten), bytesToWrite);
+
+    memcpy((blockDBN + cursorBlockIndex), numberBytesToWrite, bytesToWrite);
+
+    fsSeek(fd, bytesToWrite, SEEK_CUR);
+    cursor = fsTell(fd);
+
+    numb -= bytesToWrite;
+    bytesWritten += bytesToWrite;
+
+    int currentDBN = bfsFbnToDbn(inum, startingFBN);
+    bioWrite(currentDBN, blockDBN);
+    startingFBN++;
+
+  }
+
+  bfsSetSize(inum,size + bytesWrittenExtend);
 
 
-
-  FATAL(ENYI);                                  // Not Yet Implemented!
-  return 0;
+  //FATAL(ENYI);                                  // Not Yet Implemented!
+  return bytesWritten;
 }
