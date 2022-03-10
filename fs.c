@@ -4,6 +4,7 @@
 
 #include "bfs.h"
 #include "fs.h"
+#include <stdbool.h>
 
 // ============================================================================
 // Close the file currently open on file descriptor 'fd'.
@@ -85,27 +86,66 @@ i32 fsOpen(str fname) {
 i32 fsRead(i32 fd, i32 numb, void* buf) {
   i32 size = fsSize(fd); //get the size of the fd
   i32 inum = bfsFdToInum(fd); //turns the fd to an inum
+  i32 ofte = bfsFindOFTE(inum); //find ofte
   i32 cursor = fsTell(fd);  //gets the current cursor
-  i8 *buffer = malloc(BYTESPERBLOCK * BLOCKSPERDISK); //creates a temporary buffer to read in data
-  i32 bytesAlreadyRead;
-  
-  //getting the first and last block required to read
-  i32 currentFBN = cursor / BYTESPERBLOCK;
-  i32 endingFBN = (cursor + numb) / BYTESPERBLOCK;
 
-  cursor = cursor - (currentFBN * BYTESPERBLOCK); //get the cursor position at the inital fbn
-
-  i32 maxLoop = (endingFBN - currentFBN + 1) * BYTESPERBLOCK;
-
-  for(bytesAlreadyRead = 0; bytesAlreadyRead < maxLoop; bytesAlreadyRead += BYTESPERBLOCK){
-    i32 currentDBN = bfsFbnToDbn(inum, currentFBN);
-    bioRead(currentDBN, &buffer[bytesAlreadyRead]);
-    currentFBN = currentFBN + 1;
+  i32 startingFBN = cursor / BYTESPERBLOCK;
+  i32 lastFBN = size / BYTESPERBLOCK;
+  i32 lastRequiredByte = cursor + numb;
+  //If the lastByte is bigger than file(out of bound), than set it to size
+  if(size < lastRequiredByte){
+    lastRequiredByte = size;
+    numb = size - cursor;
   }
-  memcpy(buf, &buffer[cursor], numb);
-  fsSeek(fd, numb, SEEK_CUR);
 
-  //FATAL(ENYI);                                  // Not Yet Implemented!
+  i32 lastRequiredFBN = lastRequiredByte / BYTESPERBLOCK;
+  //If lastRequiredFBN is more than the fbn of file, than set it to the last fbn
+  if(lastFBN < lastRequiredFBN){
+    lastRequiredFBN = lastFBN;
+  }
+
+  i32 cursorIndex = cursor - (startingFBN * BYTESPERBLOCK);
+  i8 bufferBlock[BYTESPERBLOCK];
+  //If we are requesting to read only the last block, than read last block only
+  if(startingFBN == lastRequiredFBN){
+    int ret = bfsRead(inum, startingFBN, bufferBlock);
+    if(ret != 0) FATAL(ENYI);
+    memcpy(buf, bufferBlock + cursorIndex, numb);
+    fsSeek(fd, numb, SEEK_CUR);
+    return numb;
+  }
+
+  i32 currentOffset = 0;
+  i32 bufferBlockOffset = 0;
+  i32 copySize = BYTESPERBLOCK;
+  i32 fbn = startingFBN;
+  //Go through each fbn to read
+  while(fbn <= lastRequiredFBN){
+    int ret = bfsRead(inum, fbn, bufferBlock);
+    if(ret != 0) FATAL(EBADREAD);
+    //If its the first block
+    if(fbn == startingFBN){
+      bufferBlockOffset = cursorIndex;
+      copySize = BYTESPERBLOCK - cursorIndex;
+    }
+    //If its the last block
+    if(fbn == lastRequiredFBN){
+      copySize = (numb - (BYTESPERBLOCK - cursorIndex)) % BYTESPERBLOCK;
+      if(copySize == 0) lastRequiredFBN--;
+    }
+    //Otherwise its a block in the middle
+    memcpy(buf + currentOffset, bufferBlock + bufferBlockOffset, copySize);
+    if(fbn == startingFBN){
+      currentOffset += copySize;
+    } else {
+      currentOffset += BYTESPERBLOCK;
+    }
+    bufferBlockOffset = 0;
+    copySize = BYTESPERBLOCK;
+    fbn++;  //increment fbn
+  }
+
+  fsSeek(fd, numb, SEEK_CUR);
   return numb;
 }
 
@@ -167,27 +207,15 @@ i32 fsSize(i32 fd) {
 }
 
 
-
 // ============================================================================
 // Write 'numb' bytes of data from 'buf' into the file currently fsOpen'd on
 // filedescriptor 'fd'.  The write starts at the current file offset for the
 // destination file.  On success, return 0.  On failure, abort
 // ============================================================================
 i32 fsWrite(i32 fd, i32 numb, void* buf) {
-  i32 inum = bfsFdToInum(fd); //turns the fd to an inum
-  i32 cursor = fsTell(fd);  //gets the current cursor
-  
-  //Finds the current block we will start writing
-  i32 currentFBN = cursor / BYTESPERBLOCK;
-  i32 currentDBN = bfsFbnToDbn(inum, currentFBN);
-
-  //Finds the last block we will need to write to
-  i32 lastFBN = (cursor + numb) / BYTESPERBLOCK;
-  i32 lastDBN = bfsFbnToDbn(inum, lastFBN);
 
 
 
-
-  //FATAL(ENYI);                                  // Not Yet Implemented!
+  FATAL(ENYI);                                  // Not Yet Implemented!
   return 0;
 }
