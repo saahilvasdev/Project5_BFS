@@ -245,7 +245,6 @@ i32 fsWrite(i32 fd, i32 numb, void* buf) {
 
     cursorBlockIndex = cursor - (currentFBN * BYTESPERBLOCK); //keep track of the cursor index
     trailBytes = BYTESPERBLOCK - cursorBlockIndex;  //keep tracks of number of bytes left in block
-
     if(trailBytes > numb){  //Goes into this if statement if there is less bytes to write than there is space
       bytesToWrite = numb;
     }
@@ -256,7 +255,7 @@ i32 fsWrite(i32 fd, i32 numb, void* buf) {
     //Reads current block into buffer
     bfsRead(inum, currentFBN, blockDBN);
     //Resets numberBytesToWrite to all null
-    memset(numberBytesToWrite, 0, sizeof numberBytesToWrite);
+    memset(numberBytesToWrite, 0, sizeof(numberBytesToWrite));
     //Copy the bytes to be written from buf into numberBytesToWrite
     memcpy(numberBytesToWrite, (buf + bytesWritten), bytesToWrite);
     //Copy the bytes to be written into another char buffer but add the cursorIndex
@@ -266,13 +265,15 @@ i32 fsWrite(i32 fd, i32 numb, void* buf) {
     cursor = fsTell(fd);
 
     //Subtract the number of bytes we just wrote from numb
-    numb -= bytesToWrite;
+    numb = numb - bytesToWrite;
     //Add the number of bytes we just wrote to bytesWritten
-    bytesWritten += bytesToWrite;
+    bytesWritten = bytesWritten - bytesToWrite;
 
     //Find the currentDBN on disk and write the blockDBN into the actual block on disk
     int currentDBN = bfsFbnToDbn(inum, currentFBN);
     bioWrite(currentDBN, blockDBN);
+
+    //Increment to the next fbn
     currentFBN++;
 
   }
