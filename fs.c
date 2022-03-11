@@ -218,7 +218,7 @@ i32 fsWrite(i32 fd, i32 numb, void* buf) {
   i32 ofte = bfsFindOFTE(inum); //find ofte
   i32 cursor = fsTell(fd);  //gets the current cursor
 
-  i32 startingFBN = cursor / BYTESPERBLOCK;
+  i32 currentFBN = cursor / BYTESPERBLOCK;
   i32 lastFBN = size / BYTESPERBLOCK;
 
   i32 bytesWritten = 0;
@@ -231,19 +231,11 @@ i32 fsWrite(i32 fd, i32 numb, void* buf) {
   i8 blockDBN[BYTESPERBLOCK];
   i8 numberBytesToWrite[BYTESPERBLOCK];
 
-  while(true){
-    if(numb == 0){
-      break;
-    }
+  //We write one block at a time to the disk
+  //If the number of bytes we still need to write is 0, than we have finish writing everything, leave while loop
+  while(numb != 0){
 
-    // if(startingFBN == lastFBN){
-    //   bytesWrittenExtend = numb;
-    //   i32 extraBlock = (numb / BYTESPERBLOCK) + 1;
-    //   bfsExtend(inum, lastFBN + extraBlock);
-    //   //bfsSetSize(inum,size + bytesWrittenExtend);
-    // }
-
-    //THIS WORKS IF WE RUN ./a.out multiple times
+    //If we need to write more than there is space in the existing file, extend the file
     if(cursor + numb > size){
       i32 totalSize = cursor + numb;
       i32 addingBlocks = (totalSize / BYTESPERBLOCK) + 1;
@@ -251,39 +243,39 @@ i32 fsWrite(i32 fd, i32 numb, void* buf) {
       bfsSetSize(inum, totalSize);
     }
 
-    currentBlockByte = startingFBN * BYTESPERBLOCK;
-    cursorBlockIndex = cursor - currentBlockByte;
-    trailBytes = BYTESPERBLOCK - cursorBlockIndex;
+    cursorBlockIndex = cursor - (currentFBN * BYTESPERBLOCK); //keep track of the cursor index
+    trailBytes = BYTESPERBLOCK - cursorBlockIndex;  //keep tracks of number of bytes left in block
 
-    if(trailBytes > numb){
+    if(trailBytes > numb){  //Goes into this if statement if there is less bytes to write than there is space
       bytesToWrite = numb;
     }
-    else{
+    else{   //Goes into this if there is more bytes to be written than there is space in this block
       bytesToWrite = trailBytes;
     }
 
-    bfsRead(inum, startingFBN, blockDBN);
-
+    //Reads current block into buffer
+    bfsRead(inum, currentFBN, blockDBN);
+    //Resets numberBytesToWrite to all null
     memset(numberBytesToWrite, 0, sizeof numberBytesToWrite);
-
+    //Copy the bytes to be written from buf into numberBytesToWrite
     memcpy(numberBytesToWrite, (buf + bytesWritten), bytesToWrite);
-
+    //Copy the bytes to be written into another char buffer but add the cursorIndex
     memcpy((blockDBN + cursorBlockIndex), numberBytesToWrite, bytesToWrite);
-
+    //Moves the cursor a number of bytes forward
     fsSeek(fd, bytesToWrite, SEEK_CUR);
     cursor = fsTell(fd);
 
+    //Subtract the number of bytes we just wrote from numb
     numb -= bytesToWrite;
+    //Add the number of bytes we just wrote to bytesWritten
     bytesWritten += bytesToWrite;
 
-    int currentDBN = bfsFbnToDbn(inum, startingFBN);
+    //Find the currentDBN on disk and write the blockDBN into the actual block on disk
+    int currentDBN = bfsFbnToDbn(inum, currentFBN);
     bioWrite(currentDBN, blockDBN);
-    startingFBN++;
+    currentFBN++;
 
   }
-
-  //bfsSetSize(inum,size + bytesWrittenExtend);
-
 
   //FATAL(ENYI);                                  // Not Yet Implemented!
   return bytesWritten;
