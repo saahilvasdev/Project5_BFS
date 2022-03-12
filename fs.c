@@ -267,7 +267,7 @@ i32 fsWrite(i32 fd, i32 numb, void* buf) {
     //Subtract the number of bytes we just wrote from numb
     numb = numb - bytesToWrite;
     //Add the number of bytes we just wrote to bytesWritten
-    bytesWritten = bytesWritten - bytesToWrite;
+    bytesWritten = bytesWritten + bytesToWrite;
 
     //Find the currentDBN on disk and write the blockDBN into the actual block on disk
     int currentDBN = bfsFbnToDbn(inum, currentFBN);

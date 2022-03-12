@@ -235,7 +235,6 @@ void test6(i32 fd) {
 }
 
 
-
 void p5test() {
 
   i32 fd = fsOpen("P5");    // open "P5" for testing
@@ -246,7 +245,7 @@ void p5test() {
   test4(fd);
   test5(fd);
   test6(fd);
-
+  
   fsClose(fd);
 
 }
