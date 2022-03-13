@@ -89,17 +89,17 @@ i32 fsRead(i32 fd, i32 numb, void* buf) {
   i32 ofte = bfsFindOFTE(inum); //find ofte
   i32 cursor = fsTell(fd);  //gets the current cursor
 
-  i32 startingFBN = cursor / BYTESPERBLOCK;
-  i32 lastFBN = size / BYTESPERBLOCK;
-  i32 lastRequiredByte = cursor + numb;
+  i32 startingFBN = cursor / BYTESPERBLOCK; //Calculates the startingFBN block
+  i32 lastFBN = size / BYTESPERBLOCK;   //Calculates the lastFBN block
+  i32 lastRequiredByte = cursor + numb;   //Calculates the last byte we will be reading
+
   //If the lastByte is bigger than file(out of bound), than set it to size
   if(size < lastRequiredByte){
     lastRequiredByte = size;
     numb = size - cursor;
   }
-
-  i32 lastRequiredFBN = lastRequiredByte / BYTESPERBLOCK;
   //If lastRequiredFBN is more than the fbn of file, than set it to the last fbn
+  i32 lastRequiredFBN = lastRequiredByte / BYTESPERBLOCK;
   if(lastFBN < lastRequiredFBN){
     lastRequiredFBN = lastFBN;
   }
@@ -117,31 +117,38 @@ i32 fsRead(i32 fd, i32 numb, void* buf) {
 
   i32 currentOffset = 0;
   i32 bufferBlockOffset = 0;
-  i32 copySize = BYTESPERBLOCK;
+  i32 sizeOfCopy = BYTESPERBLOCK;
   i32 fbn = startingFBN;
   //Go through each fbn to read
   while(fbn <= lastRequiredFBN){
     int ret = bfsRead(inum, fbn, bufferBlock);
     if(ret != 0) FATAL(EBADREAD);
+
     //If its the first block
     if(fbn == startingFBN){
       bufferBlockOffset = cursorIndex;
-      copySize = BYTESPERBLOCK - cursorIndex;
+      sizeOfCopy = BYTESPERBLOCK - cursorIndex;
     }
+
     //If its the last block
     if(fbn == lastRequiredFBN){
-      copySize = (numb - (BYTESPERBLOCK - cursorIndex)) % BYTESPERBLOCK;
-      if(copySize == 0) lastRequiredFBN--;
+      //Calculates the last few bytes that is in the last block to be read
+      sizeOfCopy = (numb - (BYTESPERBLOCK - cursorIndex)) % BYTESPERBLOCK;
+      //Of the sizeOfCopy is somehow 0, we subtract a FBN from the variable
+      if(sizeOfCopy == 0) lastRequiredFBN--;
     }
-    //Otherwise its a block in the middle
-    memcpy(buf + currentOffset, bufferBlock + bufferBlockOffset, copySize);
+
+    //Copies data into buf + currentOffset
+    memcpy(buf + currentOffset, bufferBlock + bufferBlockOffset, sizeOfCopy);
+    //If it is the first block, than add sizeOfCopy to currentOffset
     if(fbn == startingFBN){
-      currentOffset += copySize;
+      currentOffset += sizeOfCopy;
     } else {
+      //Otherwise we add 512 to currentOffset
       currentOffset += BYTESPERBLOCK;
     }
     bufferBlockOffset = 0;
-    copySize = BYTESPERBLOCK;
+    sizeOfCopy = BYTESPERBLOCK;
     fbn++;  //increment fbn
   }
 
@@ -218,24 +225,19 @@ i32 fsWrite(i32 fd, i32 numb, void* buf) {
   i32 ofte = bfsFindOFTE(inum); //find ofte
   i32 cursor = fsTell(fd);  //gets the current cursor
 
-  i32 currentFBN = cursor / BYTESPERBLOCK;
-  i32 lastFBN = size / BYTESPERBLOCK;
+  i32 currentFBN = cursor / BYTESPERBLOCK;  //Gets the currentFBN block
+  i32 lastFBN = size / BYTESPERBLOCK;   //Gets the last FBN block
 
-  i32 bytesWritten = 0;
-  i32 trailBytes;
-  i32 bytesWrittenExtend;
-  i32 bytesToWrite;
-  i32 currentBlockByte;
-  i32 cursorBlockIndex;
+  i32 bytesWritten = 0;   //Holds the number of bytes we have already written
+  i32 trailBytes = 0;     //Holds the number of bytes available for a block to be written
+  i32 bytesToWrite = 0;   //Holds the number of bytes we need to write
+  i32 cursorBlockIndex = 0;   //Holds the index of the cursor's block
+  i32 copyNumb = numb;    //Holds numb, this variable will be modified later
 
-  i8 blockDBN[BYTESPERBLOCK];
-  i8 numberBytesToWrite[BYTESPERBLOCK];
+  i8 temporaryBuffer[BYTESPERBLOCK];  //Will hold the current disk's data
+  i8 numberBytesToWrite[BYTESPERBLOCK]; //Will hold the buf's data
 
-  //We write one block at a time to the disk
-  //If the number of bytes we still need to write is 0, than we have finish writing everything, leave while loop
-  while(numb != 0){
-
-    //If we need to write more than there is space in the existing file, extend the file
+  //If we need to write more than there is space in the existing file, extend the file
     if(cursor + numb > size){
       i32 totalSize = cursor + numb;
       i32 addingBlocks = (totalSize / BYTESPERBLOCK) + 1;
@@ -243,39 +245,42 @@ i32 fsWrite(i32 fd, i32 numb, void* buf) {
       bfsSetSize(inum, totalSize);
     }
 
+  //We write one block at a time to the disk
+  //If the number of bytes we still need to write is 0, than we have finish writing everything, leave while loop
+  while(copyNumb != 0){
     cursorBlockIndex = cursor - (currentFBN * BYTESPERBLOCK); //keep track of the cursor index
-    trailBytes = BYTESPERBLOCK - cursorBlockIndex;  //keep tracks of number of bytes left in block
-    if(trailBytes > numb){  //Goes into this if statement if there is less bytes to write than there is space
-      bytesToWrite = numb;
+    trailBytes = BYTESPERBLOCK - cursorBlockIndex;  //keep tracks of number of bytes left in block available to write
+    //Determines what bytesToWrite variable is set to
+    if(trailBytes > copyNumb){  //Goes into this if statement if there is less bytes to write than there is space
+      bytesToWrite = copyNumb;
     }
     else{   //Goes into this if there is more bytes to be written than there is space in this block
       bytesToWrite = trailBytes;
     }
 
-    //Reads current block into buffer
-    bfsRead(inum, currentFBN, blockDBN);
     //Resets numberBytesToWrite to all null
     memset(numberBytesToWrite, 0, sizeof(numberBytesToWrite));
+    //Reads current block into buffer
+    bfsRead(inum, currentFBN, temporaryBuffer);
     //Copy the bytes to be written from buf into numberBytesToWrite
     memcpy(numberBytesToWrite, (buf + bytesWritten), bytesToWrite);
     //Copy the bytes to be written into another char buffer but add the cursorIndex
-    memcpy((blockDBN + cursorBlockIndex), numberBytesToWrite, bytesToWrite);
+    memcpy((temporaryBuffer + cursorBlockIndex), numberBytesToWrite, bytesToWrite);
     //Moves the cursor a number of bytes forward
     fsSeek(fd, bytesToWrite, SEEK_CUR);
     cursor = fsTell(fd);
 
     //Subtract the number of bytes we just wrote from numb
-    numb = numb - bytesToWrite;
+    copyNumb = copyNumb - bytesToWrite;
     //Add the number of bytes we just wrote to bytesWritten
     bytesWritten = bytesWritten + bytesToWrite;
 
-    //Find the currentDBN on disk and write the blockDBN into the actual block on disk
+    //Find the currentDBN on disk and write the temporaryBuffer into the actual block on disk
     int currentDBN = bfsFbnToDbn(inum, currentFBN);
-    bioWrite(currentDBN, blockDBN);
+    bioWrite(currentDBN, temporaryBuffer);
 
     //Increment to the next fbn
     currentFBN++;
-
   }
 
   //FATAL(ENYI);                                  // Not Yet Implemented!
