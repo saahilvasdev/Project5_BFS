@@ -1,3 +1,17 @@
+/*
+Saahil Vasdev & Tommy Ni 
+CSS430 - Operating System
+Professor Dimpsey
+
+Project 5 - Filesystem (BFS)
+
+This C programs primary objective is to implement a Bothell
+File System (BFS) that has similar functions to an unix-like
+file system. We were responsible of implementing fsRead() and
+fsWrite() that incorporated 3 layers: fs, bfs, bio. 
+
+*/
+
 // ============================================================================
 // fs.c - user FileSytem API
 // ============================================================================
